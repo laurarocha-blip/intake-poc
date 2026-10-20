@@ -425,7 +425,7 @@ textarea.fld{min-height:96px;resize:vertical;}
 var STORE = "intake-poc-v360-v3";
 var MAX_FLUXOS = 3;
 /* endereço que recebe as respostas (Apps Script da V360); vazio na versão do Claude, onde o cliente baixa o arquivo */
-var ENVIO_URL = "";
+var ENVIO_URL = "https://script.google.com/macros/s/AKfycbymMXPZqUgnKARAJuuJf-TAWtzkrxUQoWcaC5Bu5x_qLx84vpAZMF7NhW8EvvYa24rv/exec";
 var STEPS = ["Cliente e participantes", "Integração", "Fluxos", "Identidade visual", "Revisão e envio"];
 var STEP_SUB = [
   "Quem acompanha a POC do seu lado e como vamos falar com cada pessoa.",
@@ -1324,7 +1324,7 @@ function introHtml() {
   return '<div class="hero"><div class="hero-in fade">' +
     '<div class="top"><img src="' + LOGO_D + '" alt="V360"><span>Prova de conceito · Ingresso Fiscal</span></div>' +
     '<h1>Vamos planejar <span>a sua POC</span></h1>' +
-    '<p class="lead">Responda este formulário para a V360 montar o cronograma, o roteiro de testes e o seu ambiente. As respostas ficam salvas enquanto você preenche.</p>' +
+    '<p class="lead">Responda este formulário para a V360 montar o roteiro de testes, a apresentação de kickoff e preparar o seu ambiente. As respostas ficam salvas enquanto você preenche.</p>' +
     '<div class="frow"><div class="glass fact"><small>Tempo de resposta</small><b>Cerca de 20 minutos</b></div>' +
     '<div class="warnbox"><b>Responda com atenção.</b> O planejamento todo parte destas respostas. Mudar depois pode alterar o cronograma. Na dúvida, confirme com a sua equipe.</div></div>' +
     '<h2>As regras da POC</h2><p class="secsub">Elas já vêm aplicadas nos campos. Quando algo estiver bloqueado ou for obrigatório, um aviso explica o motivo.</p>' +
@@ -1423,7 +1423,7 @@ function reviewData(d) {
   B.push({ title: "Fluxos", step: 2, flows: flows, rows: cap, rowsTitle: "Captura automática" });
   var mp = modsPoc(d);
   if (mp.length) B.push({ title: "Módulos adicionais", step: 2, rows: mp.map(function (x) { return r(x.m.nome, x.onde); }) });
-  B.push({ title: "Quando você entrega", step: 2, rows: prontItens(d).map(function (i) { return r(i.label, prontLabel(d.prontidao[i.id])); }), note: "Serve só para montar o cronograma. Não faz parte do escopo." });
+  B.push({ title: "Quando você entrega", step: 2, rows: prontItens(d).map(function (i) { return r(i.label, prontLabel(d.prontidao[i.id])); }), note: "Serve só para organizar as datas. Não faz parte do escopo." });
   B.push({ title: "Identidade visual", step: 3, rows: [r("Cor primária", d.corPrimaria), r("Cor secundária", d.corSecundaria), r("Logo", d.logo ? d.logo.nome + " (anexar ao e-mail)" : ""), r("Banner", d.banner ? d.banner.nome + " (anexar ao e-mail)" : "")] });
   B.forEach(function (b) { b.rows = b.rows.filter(Boolean); b.pend = P.some(function (p) { return p.step === b.step; }); });
   return B;
