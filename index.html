@@ -422,7 +422,9 @@ textarea.fld{min-height:96px;resize:vertical;}
 <div id="app"></div>
 <script>
 /* ===== dados e regras ===== */
-var STORE = "intake-poc-v360-v3";
+/* página aberta com ?teste=1: guarda as respostas em outro lugar e envia para a subpasta Testes; nada de teste se mistura com o formulário de verdade */
+var TESTE_MODO = /[?&]teste=1/.test(location.search);
+var STORE = TESTE_MODO ? "intake-poc-v360-v3-teste" : "intake-poc-v360-v3";
 var MAX_FLUXOS = 3;
 /* endereço que recebe as respostas (Apps Script da V360); vazio na versão do Claude, onde o cliente baixa o arquivo */
 var ENVIO_URL = "https://script.google.com/macros/s/AKfycbymMXPZqUgnKARAJuuJf-TAWtzkrxUQoWcaC5Bu5x_qLx84vpAZMF7NhW8EvvYa24rv/exec";
@@ -1479,8 +1481,8 @@ function doneHtml() {
   var d = S.d, anexos = [d.logo && d.logo.nome, d.banner && d.banner.nome].filter(Boolean);
   return '<div class="final"><div class="glass fade"><img src="' + LOGO_D + '" alt="V360"><div class="ok">✓</div><h1>Intake concluído</h1>' +
     (!web ? '<p>Baixe o arquivo de respostas e envie para o seu contato na V360. Com ele, a V360 monta o roteiro de testes, a apresentação de kickoff e prepara o seu ambiente.</p>' :
-      S.envio === "ok" ? '<p><b>Respostas enviadas para a V360.</b> A equipe monta o roteiro de testes e a apresentação de kickoff e entra em contato para agendar o kickoff.</p>' :
-      S.envio === "erro" ? '<div class="nt warn">Não conseguimos enviar agora. Baixe o arquivo abaixo e envie para o seu contato na V360.</div>' : '<p>Enviando as suas respostas para a V360…</p>') +
+      S.envio === "ok" ? '<p><b>Respostas recebidas pela V360.</b> Protocolo: <b>' + esc((S.recibo && S.recibo.protocolo) || d.envioId || "") + '</b>. A equipe monta o roteiro de testes e a apresentação de kickoff e entra em contato para agendar o kickoff.</p>' + resumoEnviado(d) + (TESTE_MODO ? '<div class="nt warn">Modo teste: este envio foi para a pasta de testes e não gera POC.</div>' : '') :
+      S.envio === "erro" ? '<div class="nt warn"><b>Não conseguimos confirmar o envio</b> (' + esc(S.envioErro || "erro de conexão") + '). Suas respostas continuam salvas neste navegador. Tente de novo ou baixe o arquivo abaixo e envie para o seu contato na V360.</div><div class="btns"><button type="button" class="btn cta" data-act="reenviar">Tentar enviar de novo</button></div>' : '<p>Enviando as suas respostas para a V360…</p>') +
     (anexos.length ? '<p><b>Envie junto:</b> ' + esc(anexos.join(", ")) + '</p>' : '') +
     (!web || S.envio === "erro" ? '<div class="btns"><button type="button" class="btn cta" data-act="download">Baixar arquivo de respostas</button></div>' : (S.envio === "ok" ? '<div class="btns"><button type="button" class="btn" data-act="download">Baixar uma cópia das respostas</button></div>' : '')) +
     prepHtml(d, "Antes da POC, separe") +
@@ -1569,15 +1571,22 @@ function submit() {
   }
   S.screen = "done"; S.showErr = false; S.envio = ""; enviarRespostas(S.d); render(); window.scrollTo(0, 0);
 }
-/* versão publicada na web: as respostas seguem direto para a V360. Sem resposta legível (no-cors), "ok" quer dizer que a rede entregou. */
+/* versão publicada na web: as respostas seguem direto para a V360. A tela final só diz "recebido" quando o servidor confirma que gravou (devolve ok e o protocolo). */
 function enviarRespostas(d) {
   if (!ENVIO_URL || ENVIO_URL.indexOf("__") === 0) return;
   if (!d.envioId) d.envioId = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-  S.envio = "enviando"; persist();
-  var corpo = JSON.stringify(planoJson(d)); corpo = corpo.replace(/^\{/, '{"envioId":' + JSON.stringify(d.envioId) + ",");
-  var ctl = window.AbortController ? new AbortController() : null, tm = setTimeout(function () { if (ctl) ctl.abort(); }, 20000);
-  fetch(ENVIO_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: corpo, signal: ctl ? ctl.signal : undefined })
-    .then(function () { clearTimeout(tm); S.envio = "ok"; render(); }).catch(function () { clearTimeout(tm); S.envio = "erro"; render(); });
+  S.envio = "enviando"; S.envioErro = ""; persist();
+  var plano = planoJson(d); plano.envioId = d.envioId; if (TESTE_MODO) plano.teste = true;
+  var ctl = window.AbortController ? new AbortController() : null, tm = setTimeout(function () { if (ctl) ctl.abort(); }, 30000);
+  fetch(ENVIO_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(plano), signal: ctl ? ctl.signal : undefined })
+    .then(function (r) { return r.json(); })
+    .then(function (j) { clearTimeout(tm); if (j && j.ok) { S.envio = "ok"; S.recibo = { arquivo: j.arquivo, protocolo: j.protocolo }; } else { S.envio = "erro"; S.envioErro = (j && j.erro) || "resposta inesperada do servidor"; } render(); })
+    .catch(function () { clearTimeout(tm); S.envio = "erro"; S.envioErro = "sem conexão com o servidor"; render(); });
+}
+function resumoEnviado(d) {
+  var linhas = [["Empresa", d.empresa], ["CNPJ", cnpjsPreenchidos(d).map(function (x) { return cnpjFmt(x.cnpj); }).join(", ")], ["Ponto focal", [d.pontoNome, d.pontoEmail].filter(Boolean).join(" · ")],
+    [temApuracao(d) ? "Documentos da apuração" : "Fluxos", temApuracao(d) ? apurDocsNomes(d).join(", ") : selFlows(d).map(function (f) { return f.nome; }).join(", ")]];
+  return '<div class="cardx" style="text-align:left;margin:14px 0"><b>O que a V360 recebeu</b>' + linhas.map(function (x) { return '<div class="rr"><span>' + esc(x[0]) + '</span><div>' + esc(x[1] || "—") + '</div></div>'; }).join("") + '</div>';
 }
 
 document.addEventListener("click", function (e) {
@@ -1667,6 +1676,7 @@ document.addEventListener("click", function (e) {
     case "mgo": { var p0 = S._first; S.modal = null; if (p0) { S.step = p0.step; if (p0.step <= 2) S.cur[p0.step] = p0.i; } render(); window.scrollTo(0, 0); return; }
     case "backreview": S.screen = "form"; S.step = 4; render(); window.scrollTo(0, 0); return;
     case "download": baixarRespostas(d); return;
+    case "reenviar": enviarRespostas(d); break;
     default: return;
   }
   render();
