@@ -957,11 +957,13 @@ function load() {
     f.modal = null; f.resetArmed = false;
     if (v.ver !== 2) { f.cur[2] = 0; f.reached[2] = 0; f.fs = {}; }   /* o passo Fluxos ganhou a pergunta de módulos na frente: índices antigos não valem */
     if (f.screen === "done") { f.screen = "form"; f.step = 4; }
+    var temResp = !!(f.d.empresa && f.d.empresa.trim()) || !!(f.d.pontoNome && f.d.pontoNome.trim()) || (f.d.cnpjs || []).some(function (x) { return x.cnpj && x.cnpj.trim(); });
+    if (temResp && !v.retomar) { f.retomar = { empresa: f.d.empresa, cnpj: ((f.d.cnpjs || [])[0] || {}).cnpj || "", ponto: f.d.pontoNome || "", screen: f.screen === "intro" ? "form" : f.screen, step: f.step }; f.screen = "intro"; f.introOk = false; }
     return f;
   } catch (e) { return null; }
 }
 var S = load() || fresh();
-function persist() { try { var c = clone(S); c.modal = null; c.d.logo = null; c.d.banner = null; localStorage.setItem(STORE, JSON.stringify(c)); } catch (e) {} }
+function persist() { try { if (S.envio === "ok") { localStorage.removeItem(STORE); return; } var c = clone(S); c.modal = null; c.d.logo = null; c.d.banner = null; localStorage.setItem(STORE, JSON.stringify(c)); } catch (e) {} }
 function getP(o, p) { return p.split(".").reduce(function (a, k) { return a == null ? a : a[k]; }, o); }
 function setP(o, p, v) { var ks = p.split("."), last = ks.pop(); var t = ks.reduce(function (a, k) { return a[k]; }, o); t[last] = v; }
 
@@ -1353,8 +1355,9 @@ function introHtml() {
     '<h2>As regras da POC</h2><p class="secsub">Elas já vêm aplicadas nos campos. Quando algo estiver bloqueado ou for obrigatório, um aviso explica o motivo.</p>' +
     '<div class="pgrid">' + cards.map(function (c, i) { return '<div class="glass pcard"><h3><i>' + (i + 1) + '</i>' + c[0] + '</h3><ul>' + li(c[1]) + '</ul></div>'; }).join("") + '</div>' +
     '<h2>Como funciona</h2><ol class="steps5">' + steps.map(function (s, i) { return '<li><i>' + (i + 1) + '</i><span>' + s + '</span></li>'; }).join("") + '</ol>' +
-    '<div class="ack">' + opt({ type: "check", act: "introok", label: "Li e estou ciente das regras da POC", on: S.introOk }) +
-    '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center"><button type="button" class="btn cta' + (S.introOk ? "" : " off") + '" data-act="' + (S.introOk ? "start" : "startoff") + '">Começar →</button></div></div>' +
+    (S.retomar ? '<div class="warnbox" style="margin:18px 0"><b>Encontramos respostas salvas neste navegador.</b> Empresa: <b>' + esc(S.retomar.empresa || "(sem nome)") + '</b>' + (S.retomar.cnpj ? ' · CNPJ ' + esc(S.retomar.cnpj) : '') + (S.retomar.ponto ? ' · ponto focal ' + esc(S.retomar.ponto) : '') + '. São as suas? Se não forem, comece do zero para não enviar dados de outra pessoa.<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:12px"><button type="button" class="btn cta" data-act="retomar">Continuar com estas respostas</button><button type="button" class="btn" data-act="zerar">Começar do zero</button></div></div>' : '') +
+    (S.retomar ? '' : '<div class="ack">' + opt({ type: "check", act: "introok", label: "Li e estou ciente das regras da POC", on: S.introOk }) +
+    '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center"><button type="button" class="btn cta' + (S.introOk ? "" : " off") + '" data-act="' + (S.introOk ? "start" : "startoff") + '">Começar →</button></div></div>') +
     '</div></div>';
 }
 
@@ -1648,6 +1651,8 @@ document.addEventListener("click", function (e) {
     case "stepnext": goTo(Math.min(4, S.step + 1)); return;
     case "stepback": goTo(Math.max(0, S.step - 1)); return;
     case "introok": S.introOk = !S.introOk; break;
+    case "retomar": { var rt = S.retomar; S.retomar = null; S.introOk = true; S.screen = rt.screen; S.step = rt.step; render(); window.scrollTo(0, 0); return; }
+    case "zerar": { try { localStorage.removeItem(STORE); } catch (x) {} S = fresh(); render(); window.scrollTo(0, 0); return; }
     case "start": S.screen = "form"; S.step = 0; render(); window.scrollTo(0, 0); return;
     case "startoff": S.modal = { eyebrow: "Antes de começar", title: "Confirme que leu as regras", paras: ["Marque \"Li e estou ciente das regras da POC\" para começar. As regras valem para todas as respostas do formulário."] }; break;
     case "theme": S.theme = v; break;
