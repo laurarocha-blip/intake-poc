@@ -691,7 +691,8 @@ function dispTxt(d) {
 function prontItens(d) {
   var sel = selFlows(d), L = [];
   if (temApuracao(d)) {
-    L.push({ id: "apurnotas", label: "Notas de entrada e de saída da apuração assistida" + (d.apurDocs.length ? " (" + apurDocsNomes(d).join(", ") + ")" : "") }, { id: "apurcred", label: "Credencial de acesso à API do Fisco (apuração assistida)" });
+    var dn = d.apurDocs.length ? " (" + apurDocsNomes(d).join(", ") + ")" : "";
+    L.push({ id: "apurcred", label: "Credencial de acesso à API do Fisco" }, { id: "apurentrada", label: "Notas de entrada" + dn }, { id: "apursaida", label: "Notas de saída" + dn });
     if (d.integracao === "erp") L.push({ id: "erp", label: "Acesso ao ambiente de teste do " + (ERP_LABEL[d.erp] || "ERP") });
     return L;
   }
@@ -769,10 +770,12 @@ function preparo(d) {
   if (A.length) G.push({ id: "amostra", t: "Separar a amostra de leitura", sub: "Para configurar a leitura de outros documentos, a V360 precisa de pelo menos " + AMOSTRA_MIN + " documentos de cada tipo.",
     aviso: "Sem a amostra, a leitura desse tipo de documento não é configurada.", itens: A });
   if (temApuracao(d)) {
-    G.push({ id: "apurnotas", t: "Separar as notas da apuração", sub: "Notas de entrada e de saída que serão usadas no teste da apuração assistida. Não há captura automática: você fornece.",
-      itens: apurDocsSel(d).map(function (x) { return { b: x[1], t: "notas de entrada e de saída" }; }) });
     G.push({ id: "apurcred", t: "Gerar a credencial da API do Fisco", sub: "No portal " + APUR_URL + ", gere a credencial de acesso à API da apuração assistida.",
       aviso: "Não envie a credencial por este formulário.", itens: APUR_PASSOS.map(function (t, i) { return { b: "Passo " + (i + 1), t: t }; }) });
+    G.push({ id: "apurentrada", t: "Separar as notas de entrada", sub: "Notas de entrada que serão usadas no teste da apuração assistida. Não há captura automática: você fornece.",
+      itens: apurDocsSel(d).map(function (x) { return { b: x[1], t: "notas de entrada" }; }) });
+    G.push({ id: "apursaida", t: "Separar as notas de saída", sub: "Notas de saída que serão usadas no teste da apuração assistida. Não há captura automática: você fornece.",
+      itens: apurDocsSel(d).map(function (x) { return { b: x[1], t: "notas de saída" }; }) });
   }
   return G;
 }
