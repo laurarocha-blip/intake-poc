@@ -469,8 +469,11 @@ var MODULOS = [
 var APUR_URL = "https://consumo.tributos.gov.br/";
 var APUR_PASSOS = ["Em “Gerar Credencial de Acesso para API”, na seção “Apuração Assistida”, clique em “Cancelar Credencial”.", "Na mesma página, acima, gere uma nova credencial. Ela já vem com a permissão para a v2."];
 function temApuracao(d) { return (d.mods || []).indexOf("apur") > -1; }
-/* POC de apuração assistida é só apuração: 1 fluxo, sem validações, sem automações e sem outros módulos */
-function maxFluxos(d) { return temApuracao(d) ? 1 : MAX_FLUXOS; }
+/* POC de apuração assistida é só apuração: não há fluxos, validações nem automações, só os tipos de documento que serão ingressados, e não combina com outros módulos */
+function maxFluxos(d) { return temApuracao(d) ? 0 : MAX_FLUXOS; }
+var APUR_DOCS = [["nfe", "NF-e", "Notas fiscais de mercadoria."], ["cte", "CT-e", "Conhecimentos de transporte."], ["nfse", "NFS-e", "Notas fiscais de serviço."]];
+function apurDocsSel(d) { return APUR_DOCS.filter(function (x) { return (d.apurDocs || []).indexOf(x[0]) > -1; }); }
+function apurDocsNomes(d) { return apurDocsSel(d).map(function (x) { return x[1]; }); }
 function moduloById(id) { return MODULOS.filter(function (m) { return m.id === id; })[0] || null; }
 function modsSel(d) { return MODULOS.filter(function (m) { return (d.mods || []).indexOf(m.id) > -1; }); }
 function modTipos(m) { return m.macros.map(function (i) { return MACRO_TIPO[i]; }).join(" ou "); }
@@ -488,7 +491,7 @@ function modMotivoBloqueio(d, m) {
   if ((d.mods || []).indexOf(m.id) > -1) return "";
   if (temApuracao(d)) return "A POC de apuração assistida é só apuração: não combina com outros módulos. Desmarque a apuração para escolher outro.";
   if (m.id === "apur" && (d.mods || []).length) return "A apuração assistida é uma POC só dela, sem outros módulos. Desmarque os outros módulos para escolhê-la.";
-  if (m.id === "apur" && d.fluxosSel.length > 1) return "A POC de apuração assistida tem um só fluxo, e você escolheu " + d.fluxosSel.length + ". Desmarque os outros fluxos para escolhê-la.";
+  if (m.id === "apur" && d.fluxosSel.length) return "A POC de apuração assistida não tem fluxos: você escolhe só os tipos de documento. Desmarque os fluxos para escolhê-la.";
   if ((d.mods || []).length >= MAX_MODULOS) return "Você já escolheu " + MAX_MODULOS + " módulos, o máximo da POC. Desmarque um deles para escolher outro.";
   if (m.macros && !fluxoDoModulo(d, m) && d.fluxosSel.length >= MAX_FLUXOS) return m.nome + " precisa de um fluxo de " + modTipos(m) + ", e você já escolheu " + MAX_FLUXOS + " fluxos de outros tipos. Desmarque um fluxo para usar este módulo.";
   return "";
@@ -564,7 +567,7 @@ var PREM = {
   cnpjs: { t: "CNPJs da POC", x: ["A captura automática e o certificado A1 são por CNPJ. A V360 configura o ambiente com os CNPJs que você informar.", "Informe os CNPJs (matriz e filiais) que vão receber as notas testadas."] },
   disp: { t: "Disponibilidade da equipe", x: ["Usamos os dias e o horário para marcar as reuniões de trabalho, e os períodos de ausência para não marcar nada neles.", "Se a disponibilidade mudar durante a POC, avise a V360 pelo grupo de comunicação."] },
   modulos: { t: "Módulos adicionais", x: ["São opcionais, no máximo 2 por POC.", "Agendamento de entregas e conferência cega valem para fluxos de material; medição de serviço, para serviços; gestão de pedidos, para material e serviços. Ao escolher um deles, o V360 já marca o fluxo padrão (Material padrão ou Serviço padrão), que você pode trocar. Gestão de pedidos não marca fluxo: você escolhe um de material ou de serviços.", "Módulo de Chamados, apuração assistida, duplicatas escriturais e antecipação de recebíveis valem para a empresa toda, sem fluxo específico.", "Cada módulo escolhido entra no roteiro de homologação e no cronograma."] },
-  apuracao: { t: "Apuração assistida", x: ["Não há captura automática: você fornece as notas de entrada e de saída que serão usadas no teste.", "Você também gera a credencial de acesso à API do Fisco. No portal " + APUR_URL + ", " + APUR_PASSOS.join(" ")] },
+  apuracao: { t: "Apuração assistida", x: ["Não há fluxos nem validações: você só escolhe quais tipos de documento serão ingressados (NF-e, CT-e e NFS-e, até os 3).", "Não há captura automática: você fornece as notas de entrada e de saída que serão usadas no teste.", "Você também gera a credencial de acesso à API do Fisco. No portal " + APUR_URL + ", " + APUR_PASSOS.join(" ")] },
   pront: { t: "Prontidão", x: ["O cronograma depende de quando você entrega cada item. Uma estimativa já ajuda: o que atrasar empurra as reuniões que dependem dele.", "Se a data mudar, avise a V360 pelo grupo de comunicação."] },
   obrig: { t: "Pergunta obrigatória", x: ["Esta resposta é necessária para o planejamento da POC."] }
 };
@@ -577,7 +580,7 @@ function blank() {
     protheusVersao: "", protheusBanco: "", protheusAcesso: "", protheusCustom: "", protheusConf: [],
     cienteTabela: false,
     certA1: "", outraFerramenta: "", prefs: [{ uf: "", mun: "" }],
-    fluxosSel: [], cfg: {}, mods: [], fxAuto: [], apurOn: false, valBkp: {}, envioId: "",
+    fluxosSel: [], cfg: {}, mods: [], fxAuto: [], apurOn: false, valBkp: {}, apurDocs: [], envioId: "",
     cnpjs: [{ cnpj: "", nome: "" }], dias: ["seg", "ter", "qua", "qui", "sex"], horario: "", folgas: [{ de: "", ate: "" }], prontidao: {},
     corPrimaria: "", corSecundaria: "", logo: null, banner: null, termo: false
   };
@@ -687,10 +690,14 @@ function dispTxt(d) {
 }
 function prontItens(d) {
   var sel = selFlows(d), L = [];
+  if (temApuracao(d)) {
+    L.push({ id: "apurnotas", label: "Notas de entrada e de saída da apuração assistida" + (d.apurDocs.length ? " (" + apurDocsNomes(d).join(", ") + ")" : "") }, { id: "apurcred", label: "Credencial de acesso à API do Fisco (apuração assistida)" });
+    if (d.integracao === "erp") L.push({ id: "erp", label: "Acesso ao ambiente de teste do " + (ERP_LABEL[d.erp] || "ERP") });
+    return L;
+  }
   if (sel.some(function (f) { return needsBases(d, f); })) L.push({ id: "base", label: "Base de validação preenchida no modelo da V360" });
   if (sel.some(function (f) { return cfgPeek(d, f).entrada.indexOf("captura") > -1; })) L.push({ id: "cert", label: "Certificado digital A1" });
   if (sel.length) L.push({ id: "notas", label: "Notas para testar" });
-  if (temApuracao(d)) L.push({ id: "apurnotas", label: "Notas de entrada e de saída da apuração assistida" }, { id: "apurcred", label: "Credencial de acesso à API do Fisco (apuração assistida)" });
   if (sel.some(precisaAmostra)) L.push({ id: "amostra", label: "Amostra de pelo menos " + AMOSTRA_MIN + " documentos de cada tipo de outros documentos" });
   if (d.integracao === "erp") L.push({ id: "erp", label: "Acesso ao ambiente de teste do " + (ERP_LABEL[d.erp] || "ERP") });
   return L;
@@ -722,15 +729,9 @@ function normalize(d) {
     if (c.entrada.indexOf("captura") > -1 && !autoOk(d, f).ok) { c.entrada = c.entrada.filter(function (v) { return v !== "captura"; }); avisos.push(f.nome); }
   });
   d.mods = (d.mods || []).filter(function (id) { return !!moduloById(id); }).slice(0, MAX_MODULOS);
-  /* POC com apuração assistida: o fluxo existe, mas não tem validação (guarda a escolha para o caso de o módulo sair) */
-  if (temApuracao(d)) {
-    if (!d.apurOn) { d.valBkp = {}; selFlows(d).forEach(function (f) { var c0 = cfgOf(d, f); d.valBkp[f.id] = { val: c0.val.slice(), auto: c0.auto.slice() }; }); d.apurOn = true; }
-    d.fluxosSel = d.fluxosSel.slice(0, 1);
-    selFlows(d).forEach(function (f) { var c = cfgOf(d, f); c.val = []; c.valOutras = ""; c.auto = []; });
-  } else if (d.apurOn) {
-    selFlows(d).forEach(function (f) { var c = cfgOf(d, f), b = d.valBkp && d.valBkp[f.id]; c.val = b ? b.val : VALIDACOES[f.macro].map(function (x) { return x.id; }); c.auto = b ? b.auto : AUTOS.filter(function (a) { return a.padrao; }).map(function (a) { return a.v; }); });
-    d.apurOn = false; d.valBkp = {};
-  }
+  /* POC com apuração assistida: não há fluxos (só os tipos de documento) */
+  if (temApuracao(d)) { d.fluxosSel = []; d.fxAuto = []; }
+  d.apurDocs = (d.apurDocs || []).filter(function (id, i, a) { return a.indexOf(id) === i && APUR_DOCS.some(function (x) { return x[0] === id; }); });
   return avisos;
 }
 
@@ -768,7 +769,8 @@ function preparo(d) {
   if (A.length) G.push({ id: "amostra", t: "Separar a amostra de leitura", sub: "Para configurar a leitura de outros documentos, a V360 precisa de pelo menos " + AMOSTRA_MIN + " documentos de cada tipo.",
     aviso: "Sem a amostra, a leitura desse tipo de documento não é configurada.", itens: A });
   if (temApuracao(d)) {
-    G.push({ id: "apurnotas", t: "Separar as notas da apuração", sub: "Notas de entrada e de saída que serão usadas no teste da apuração assistida. Não há captura automática: você fornece.", itens: [] });
+    G.push({ id: "apurnotas", t: "Separar as notas da apuração", sub: "Notas de entrada e de saída que serão usadas no teste da apuração assistida. Não há captura automática: você fornece.",
+      itens: apurDocsSel(d).map(function (x) { return { b: x[1], t: "notas de entrada e de saída" }; }) });
     G.push({ id: "apurcred", t: "Gerar a credencial da API do Fisco", sub: "No portal " + APUR_URL + ", gere a credencial de acesso à API da apuração assistida.",
       aviso: "Não envie a credencial por este formulário.", itens: APUR_PASSOS.map(function (t, i) { return { b: "Passo " + (i + 1), t: t }; }) });
   }
@@ -820,7 +822,9 @@ function termoDoc(d) {
     if (v.nivel === "tributos") vs.tributos = true; else if (v.nivel === "item" || /^(Pedido|Validar nota contra)/.test(v.nome)) vs.pedido = true; else vs.nota = true;
   }); });
 
-  B.push({ h: "1. Objetivo", p: ["Este termo registra o compromisso entre a V360 e " + emp + " para a prova de conceito (POC) do V360 Ingresso Fiscal. A POC mostra, na prática, que o V360 atende aos processos de " + juntar(unicos(sel.map(function (f) { return DOCS_TERMO[f.macro]; }))) + " de " + emp + "."] });
+  var apur = temApuracao(d), docsA = apurDocsNomes(d);
+  B.push({ h: "1. Objetivo", p: [apur ? "Este termo registra o compromisso entre a V360 e " + emp + " para a prova de conceito (POC) da apuração assistida de IBS e CBS do V360. A POC mostra, na prática, que o V360 concilia a apuração a partir dos documentos " + juntar(docsA) + " de " + emp + "."
+    : "Este termo registra o compromisso entre a V360 e " + emp + " para a prova de conceito (POC) do V360 Ingresso Fiscal. A POC mostra, na prática, que o V360 atende aos processos de " + juntar(unicos(sel.map(function (f) { return DOCS_TERMO[f.macro]; }))) + " de " + emp + "."] });
 
   var testes = [];
   if (temCaptura) testes.push("captura automática");
@@ -829,9 +833,10 @@ function termoDoc(d) {
   if (temVal) testes.push("validações", "tratamento de divergências");
   if (temAuto) testes.push("workflow (atribuição e alertas)");
   if (mpoc.length) testes.push("módulos adicionais (" + mnomes + ")");
-  B.push({ h: "2. Escopo e prazo", p: ["A POC cobre " + sel.length + (sel.length === 1 ? " fluxo:" : " fluxos:")],
-    l: sel.map(function (f) { return f.nome + " (" + DOCS_TERMO[f.macro] + ")"; }),
-    p2: ["Em cada fluxo valem o meio de entrada, as validações e as automações descritos no resumo deste formulário. Serão testados: " + juntar(testes) + ".",
+  if (apur) testes = ["ingresso dos documentos (" + juntar(docsA) + ")", "apuração assistida (conciliação nota a nota)", "usabilidade", "indicadores de operação"];
+  B.push({ h: "2. Escopo e prazo", p: [apur ? "A POC cobre a apuração assistida, com o ingresso dos seguintes tipos de documento:" : "A POC cobre " + sel.length + (sel.length === 1 ? " fluxo:" : " fluxos:")],
+    l: apur ? docsA : sel.map(function (f) { return f.nome + " (" + DOCS_TERMO[f.macro] + ")"; }),
+    p2: [apur ? "Não há fluxos nem validações: os documentos são ingressados para a conciliação da apuração. Serão testados: " + juntar(testes) + "." : "Em cada fluxo valem o meio de entrada, as validações e as automações descritos no resumo deste formulário. Serão testados: " + juntar(testes) + ".",
       "O prazo e o cronograma são definidos pela V360 a partir das respostas do formulário e contam a partir da reunião de kickoff. O que estiver fora do escopo acima (validações fora da lista, customizações, ajustes no ERP) é avaliado pela V360 e pode alterar o escopo e o prazo."] });
 
   var v360 = ["Disponibilizar o ambiente de teste e o acesso ao V360, com suporte técnico durante a POC.",
@@ -845,8 +850,8 @@ function termoDoc(d) {
   if (base) cli.push("Preencher a base de validação (planilha modelo da V360) com pedidos, itens e impostos.");
   if (temCaptura) cli.push("Disponibilizar o certificado digital A1 do CNPJ para o cadastro no V360.");
   var nXml = sel.filter(soXml).length, nPdf = sel.length - nXml;
-  cli.push("Separar as notas a serem testadas " + (temApuracao(d) ? "no fluxo. " : "em cada fluxo, incluindo notas que devem gerar divergência. ") + (nXml && nPdf ? "NF-e e CT-e: somente XML. Demais documentos: PDF ou XML." : nXml ? "Formato: somente XML." : "Formato: PDF ou XML."));
-  if (temApuracao(d)) cli.push("Fornecer as notas de entrada e de saída que serão usadas no teste da apuração assistida (não há captura automática) e gerar a credencial de acesso à API do Fisco, conforme os próximos passos.");
+  if (!temApuracao(d)) cli.push("Separar as notas a serem testadas em cada fluxo, incluindo notas que devem gerar divergência. " + (nXml && nPdf ? "NF-e e CT-e: somente XML. Demais documentos: PDF ou XML." : nXml ? "Formato: somente XML." : "Formato: PDF ou XML."));
+  if (temApuracao(d)) cli.push("Fornecer as notas de entrada e de saída de " + juntar(docsA) + " que serão usadas no teste da apuração assistida (não há captura automática) e gerar a credencial de acesso à API do Fisco, conforme os próximos passos.");
   if (sel.some(precisaAmostra)) cli.push("Enviar uma amostra de pelo menos " + AMOSTRA_MIN + " documentos de cada tipo de outros documentos, para a V360 configurar a leitura.");
   if (integra) cli.push("Disponibilizar o acesso e as informações do ambiente de teste do " + erpNome + (d.erp === "Protheus" ? " (notas e pedido de compra criados no ambiente de teste do Protheus)" : "") + ". A V360 não altera o ERP: os ajustes nele são da equipe de " + emp + ".");
   cli.push("Avisar a V360 sobre qualquer mudança de escopo ou indisponibilidade da equipe.");
@@ -862,14 +867,15 @@ function termoDoc(d) {
   if (vs.nota) cr.push("Demais validações de nota selecionadas");
   if (mpoc.length) cr.push("Módulos adicionais: " + mnomes);
   cr.push("Indicadores de operação", "Usabilidade");
+  if (apur) cr = ["Ingresso dos documentos " + juntar(docsA), "Apuração assistida de IBS e CBS conciliada, nota a nota, com os documentos da empresa", "Indicadores de operação", "Usabilidade"];
   B.push({ h: "5. Critérios de decisão", p: ["A POC será avaliada pelos critérios abaixo, definidos em conjunto com a V360 a partir das suas escolhas:"], l: cr });
 
   var envio = [];
   if (base) envio.push("a base de validação preenchida");
   if (temCaptura) envio.push("o certificado A1");
-  envio.push("as notas a testar");
+  if (!apur) envio.push("as notas a testar");
   if (sel.some(precisaAmostra)) envio.push("a amostra de documentos para a leitura");
-  if (temApuracao(d)) envio.push("as notas de entrada e de saída da apuração assistida", "a credencial da API do Fisco");
+  if (apur) envio.push("as notas de entrada e de saída de " + juntar(docsA) + " da apuração assistida", "a credencial da API do Fisco");
   if (integra && d.erp === "Protheus") envio.push("notas e pedido criados no ambiente de teste do Protheus");
   B.push({ h: "6. Próximos passos para iniciar", l: [
     "Enviar o “de acordo” neste termo. Responsável: " + emp + ".",
@@ -896,6 +902,7 @@ function planoJson(d) {
       protheus: isP ? { versao: d.protheusVersao, banco: d.protheusBanco, acesso: d.protheusAcesso, customizacoes: d.protheusCustom, prontos: d.protheusConf } : null },
     baseSimulada: d.integracao === "nenhuma" && sel.some(function (f) { return needsBases(d, f); }),
     captura: { a1: d.certA1, outraFerramenta: d.outraFerramenta, prefeituras: prefsPreenchidas(d).map(function (p) { return { uf: p.uf, municipio: p.mun.trim() }; }), soCaptura: soCaptura(d) },
+    apuracao: temApuracao(d) ? { docs: apurDocsSel(d).map(function (x) { return { id: x[0], nome: x[1] }; }) } : null,
     fluxos: sel.map(function (f, i) {
       var c = cfgPeek(d, f);
       return { n: i + 1, id: f.id, nome: f.nome, tipo: MACRO_CURTO[f.macro], macro: f.macro, entradas: c.entrada, entradaTexto: entradaTxt(f, c, d), formato: soXml(f) ? "xml" : "pdf-xml", amostraMin: precisaAmostra(f) ? AMOSTRA_MIN : 0,
@@ -1015,7 +1022,7 @@ function flowSummary(d, f) {
 function modsRender(d) {
   var h = '<div class="cnt3"><b>' + (d.mods || []).length + ' de ' + MAX_MODULOS + ' módulos</b></div>';
   if (S.modAviso) h += nt(esc(S.modAviso), "");
-  if (temApuracao(d)) h += nt("<b>Apuração assistida:</b> não há captura automática. Você fornece as notas de entrada e de saída do teste e gera a credencial de acesso à API do Fisco. " + premLink("apuracao", "Ver os passos"), "warn");
+  if (temApuracao(d)) h += nt("<b>Apuração assistida:</b> não há fluxos nem validações. No próximo passo você escolhe só os tipos de documento que serão ingressados. Não há captura automática: você fornece as notas de entrada e de saída do teste e gera a credencial de acesso à API do Fisco. " + premLink("apuracao", "Ver os passos"), "warn");
   modsSemFluxo(d).forEach(function (m) { h += nt("<b>" + esc(m.nome) + "</b> precisa de um fluxo de " + esc(modTipos(m)) + ": escolha um na etapa de fluxos.", "warn"); });
   return h + '<div class="opts">' + MODULOS.map(function (m) {
     var on = (d.mods || []).indexOf(m.id) > -1, mot = modMotivoBloqueio(d, m);
@@ -1138,12 +1145,25 @@ function detailRender(d, k) {
     (temApuracao(d) ? '<div class="fs done"><i>' + CK + '</i><div class="fx"><b>O que a plataforma automatiza</b><span>Não se aplica na apuração assistida</span></div></div>' : fsec(3, cur, "O que a plataforma automatiza", "", autoNomes(c).join(", ") || "nada", f.id, c3));
   return h;
 }
+function apurDocsRender(d) {
+  var n = (d.apurDocs || []).length;
+  return '<div class="cnt3"><b>' + n + ' de ' + APUR_DOCS.length + ' tipos</b></div>' + nt("Não há fluxos nem validações na apuração assistida. A V360 só precisa saber quais documentos serão ingressados.", "") +
+    '<div class="opts">' + APUR_DOCS.map(function (x) { return opt({ type: "check", act: "apurtoggle", v: x[0], label: x[1], sub: x[2], on: (d.apurDocs || []).indexOf(x[0]) > -1 }); }).join("") + '</div>';
+}
 function flowQs(d) {
   var sel = selFlows(d), Q = [];
   Q.push({ id: "mods", noSkip: true, label: "Módulos adicionais", prem: "modulos", title: "Quer testar algum módulo adicional? (opcional)",
-    help: "No máximo 2. Os módulos de material e de serviço já marcam o fluxo padrão; você pode trocar na escolha de fluxos.", cta: "Escolher os fluxos →",
+    help: "No máximo 2. Os módulos de material e de serviço já marcam o fluxo padrão; você pode trocar na escolha de fluxos.", cta: temApuracao(d) ? "Escolher os documentos →" : "Escolher os fluxos →",
     valid: function (d) { return true; }, summary: function (d) { return modsSel(d).map(function (m) { return m.nome; }).join(" · ") || "nenhum"; },
     render: function (d) { return modsRender(d); } });
+  if (temApuracao(d)) {
+    Q.push({ id: "apurdocs", noSkip: true, label: "Documentos da apuração", prem: "apuracao", title: "Quais documentos serão ingressados na apuração assistida?", help: "Escolha de 1 a 3 tipos. Você pode mudar a escolha a qualquer momento.",
+      valid: function (d) { return (d.apurDocs || []).length >= 1; }, missing: function () { return ["pelo menos 1 tipo de documento"]; }, summary: function (d) { return apurDocsNomes(d).join(" · "); },
+      render: apurDocsRender });
+    Q.push({ id: "pront", label: "Prontidão", prem: "pront", title: "Quando você consegue deixar isso pronto?", help: "A ordem do cronograma depende disso. Pode ser uma estimativa.", cta: "Concluir →",
+      valid: prontOk, missing: prontMissing, summary: function (d) { return prontItens(d).map(function (i) { return i.label + ": " + prontLabel(d.prontidao[i.id]).toLowerCase(); }).join(" · "); }, render: prontRender });
+    return Q;
+  }
   Q.push({ id: "pick", noSkip: true, label: "Fluxos escolhidos", prem: "limite", title: "Quais fluxos você quer testar?", help: "Escolha até 3. Você pode mudar a escolha a qualquer momento.",
     valid: function (d) { return d.fluxosSel.length >= 1 && !modsSemFluxo(d).length; },
     missing: function (d) { var m = []; if (!d.fluxosSel.length) m.push("pelo menos 1 fluxo"); modsSemFluxo(d).forEach(function (x) { m.push("um fluxo de " + modTipos(x.macros ? x : x) + " para " + x.nome); }); return m; }, summary: function (d) { return selFlows(d).map(function (f) { return f.nome; }).join(" · "); },
@@ -1336,7 +1356,7 @@ function introHtml() {
 }
 
 function trailHtml() {
-  var curto = ["Cliente", "Integração", "Fluxos", "Identidade", "Revisão"];
+  var curto = ["Cliente", "Integração", temApuracao(S.d) ? "Documentos" : "Fluxos", "Identidade", "Revisão"];
   return '<nav class="trail" aria-label="Passos">' + STEPS.map(function (s, i) {
     var st = stepStatus(i);
     return '<button type="button" class="tr ' + st[0] + '" data-act="go" data-v="' + i + '"' + (st[0] === "cur" ? ' aria-current="step"' : '') + '><i>' + (st[0] === "done" ? CK : i + 1) + '</i><span>' + curto[i] + '</span></button>';
@@ -1414,13 +1434,16 @@ function reviewData(d) {
   B.push({ title: "Integração", step: 1, rows: [r("Integração", d.integracao === "erp" ? "Ao ERP (" + (ERP_LABEL[d.erp] || "") + ")" : d.integracao === "nenhuma" ? "Sem integração" : ""),
     r("Protheus", isP ? "versão " + d.protheusVersao + ", " + d.protheusBanco + ", acesso " + d.protheusAcesso + ", customizações: " + ({ sim: "sim", nao: "não", nao_sei: "não sei" }[d.protheusCustom] || "") : ""),
     r("Ciente do custo", d.cienteCusto ? "Sim" : ""), r("Ciente da base simulada", d.cienteTabela && d.integracao === "nenhuma" ? "Sim" : "")] });
+  if (temApuracao(d)) {
+    B.push({ title: "Documentos da apuração assistida", step: 2, rows: [r("Tipos de documento ingressados", apurDocsNomes(d).join(", "))] });
+  }
   var flows = selFlows(d).map(function (f, k) {
     var c = cfgPeek(d, f);
     return { nome: "Fluxo " + (k + 1) + " · " + f.nome, tipo: MACRO_CURTO[f.macro], entrada: entradaTxt(f, c, d),
       val: (temApuracao(d) ? "Não se aplica (apuração assistida)" : valResumo(f, c)) + (c.valOutras.trim() ? ". Fora da lista (customização): " + c.valOutras.trim().replace(/\n/g, "; ") : ""), auto: temApuracao(d) ? "Não se aplica (apuração assistida)" : (autoNomes(c).join(", ") || "nenhuma") };
   });
   var cap = [r("Certificado A1", { sim: "Sim", nao: "Não" }[d.certA1]), r("Outra ferramenta na SEFAZ", d.certA1 === "nao" ? "" : { sim: "Sim", nao: "Não" }[d.outraFerramenta]), r("Prefeituras avaliadas", prefTxt(d))];
-  B.push({ title: "Fluxos", step: 2, flows: flows, rows: cap, rowsTitle: "Captura automática" });
+  if (!temApuracao(d)) B.push({ title: "Fluxos", step: 2, flows: flows, rows: cap, rowsTitle: "Captura automática" });
   var mp = modsPoc(d);
   if (mp.length) B.push({ title: "Módulos adicionais", step: 2, rows: mp.map(function (x) { return r(x.m.nome, x.onde); }) });
   B.push({ title: "Quando você entrega", step: 2, rows: prontItens(d).map(function (i) { return r(i.label, prontLabel(d.prontidao[i.id])); }), note: "Serve só para organizar as datas. Não faz parte do escopo." });
@@ -1476,8 +1499,11 @@ function premModal(key, msg, title) {
 
 /* ===== render ===== */
 function applyTheme() { if (S.theme === "auto") document.documentElement.removeAttribute("data-theme"); else document.documentElement.setAttribute("data-theme", S.theme); }
+var STEP2_FLUXOS = [STEPS[2], STEP_SUB[2]];
 function render() {
   var avisos = normalize(S.d); S.avisos = avisos;
+  STEPS[2] = temApuracao(S.d) ? "Documentos" : STEP2_FLUXOS[0];
+  STEP_SUB[2] = temApuracao(S.d) ? "Escolha quais tipos de documento serão ingressados na apuração assistida. Não há fluxos." : STEP2_FLUXOS[1];
   applyTheme();
   var html;
   if (S.screen === "intro") html = introHtml();
@@ -1564,6 +1590,7 @@ document.addEventListener("click", function (e) {
       break;
     }
     case "rmfx": { var tv = modTravaFluxo(d, fluxoById(v)); if (tv) { S.modal = premModal("modulos", "Este é o único fluxo compatível com " + tv + ". Desmarque o módulo para tirar este fluxo."); break; } } d.fxAuto = (d.fxAuto || []).filter(function (x) { return x !== v; }); d.fluxosSel = d.fluxosSel.filter(function (x) { return x !== v; }); S.cur[2] = Math.min(S.cur[2], questions(2, d).length); break;
+    case "apurtoggle": d.apurDocs = tog(d.apurDocs || [], v); break;
     case "enttoggle": { var c1 = cfgOf(d, flowOfEl(el)); c1.entrada = tog(c1.entrada, v); break; }
     case "valtoggle": { var c2 = cfgOf(d, flowOfEl(el)); c2.val = tog(c2.val, v); break; }
     case "valall": { var f3 = flowOfEl(el); cfgOf(d, f3).val = VALIDACOES[f3.macro].map(function (x) { return x.id; }); break; }
